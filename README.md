@@ -1,51 +1,52 @@
-# us-treasury
+# meridian-us-treasury
 
-A Meridian data plugin, made by `meridian plugin new --role data`: it puts a
-vendor's prices into the deployment's lake.
+The US Treasury's daily interest rates for [Open Meridian](https://open-meridian.dev),
+as a data plugin: each business day's **par yield curve**, **real par yield
+curve** and **bill rates**, read from Treasury's daily Treasury rates files,
+put into a deployment's lake as rates. No key, no account: Treasury's data
+are US government work.
 
-It runs beside a sidecar in a Meridian deployment and reaches nothing of the
-deployment's else. What it may publish and subscribe to comes from the roles
-`pyproject.toml` declares, once a deployment admin approves them when it is
-launched, never from its code. Its vendor is its own to reach: `vendor.py`
-stands in for one, answering from responses written into it, so it runs
-anywhere until you replace it with your vendor's client.
+| Dataset | What it holds | History |
+|---|---|---|
+| `ust_par` | Nominal par yields, 1 month to 30 years, bond-equivalent | from 1990 |
+| `ust_real` | Real par yields, 5 to 30 years, bond-equivalent | from 2003 |
+| `ust_bills` | Each bill's bank discount rate and coupon equivalent, 4 to 52 weeks | from 2002 |
 
-Put it in a deployment that `meridian connect` signed you in to:
+Each curve is one record in the deployment, the platform's seeded rate curve
+named by Treasury's title (`ustreasury:Daily Treasury Par Yield Curve
+Rates` and the others), and its points are rows, each with its tenor as
+Treasury labels it. A tenor Treasury leaves empty is no row, never a zero.
+
+## Using it
+
+Put it in a deployment that `meridian connect` signed you in to, and launch
+it:
 
     meridian plugin upload
     meridian plugin launch us-treasury 0.1.0 --instance us-treasury
 
-A deployment admin then licenses its dataset, and entitles the plugins that
-may read it, on the dashboard's Data sources page. On a deployment installed
-for development, run it as you write it, each save running in about a second:
+Then, on the dashboard's **Data sources** page, a deployment admin licenses
+`us-treasury:ust_par`, `:ust_real` and `:ust_bills` and entitles the plugins
+that read them. On its first run it reads each curve's history back, which
+takes a few minutes; after that it checks Treasury every hour.
 
-    meridian plugin dev --instance us-treasury
+Its pages are under **Manage**: Connection (each file's state, latest day,
+history read) and Datasets (what it serves, its wants, each curve's record).
+Each is also a read tool for agents, `read_connection` and `read_datasets`.
+The [docs/](docs/README.md) are what a deployment admin reads on its
+Documentation tab.
 
-Hold it to the rules every Meridian plugin is built to, and run its tests:
+## Developing it
 
-    pip install -e . pytest
-    meridian plugin check --verified --run-tests
+    make ci-local                     # lint, tests, plugin check, image, e2e
+    make preview SHOTS=/tmp/shots     # the pages in a browser, at 375, 582 and 1280 px
 
-Its tests run the data suite the SDK carries (`tests/test_suite.py`): each
-case of the role mapped to one of the vendor's responses and run through the
-plugin's own conversion (`convert.py`). A plugin holding `data` is verified
-for it only by passing every case: keep each passing as you replace the
-vendor. A case about trades or quotes, which its daily dataset never
-publishes, is marked not presented, with why, until a dataset declares them. Every price is parsed from the vendor's text as a `Decimal`, never
-through a `float`; every subject and venue is resolved before a row names
-it, and what does not resolve is reported.
+Every gate runs in a container. The tests run against Treasury's real
+answers, recorded and committed under `src/us_treasury/responses/` and
+`tests/responses/`; nothing in CI calls Treasury. `AGENTS.md` is for coding
+agents working on it.
 
-Its catalogue (`declaration.py`) declares the dataset it serves: its key,
-vendor, data types, how its rows arrive, its cadence, history, the vendor's
-terms and its day. Its pages are under the dashboard's Manage (`admin`):
-Connection, whether the vendor answers and what was asked of it, and
-Datasets, what it serves and the standing wants it keeps current. It shows
-no price: prices are the reading roles'. Each page is also a read tool for
-an agent an admin delegates to, `read_connection` and `read_datasets`. They
-are built on Open Meridian's plugin UI kit, which the dashboard serves on the
-plugin's own host at `/.meridian/ui/`.
+## Licence
 
-`AGENTS.md` teaches any coding agent to build pages with the kit, and the same
-live loop; `CLAUDE.md` and the `develop-live` skill under `.claude/` lead
-Claude Code to it. Commit them with the plugin, so whoever works on it next
-has them too; `.dockerignore` keeps them out of its image.
+Apache-2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE). This project is not
+affiliated with or endorsed by the US Department of the Treasury.

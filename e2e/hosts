@@ -1,0 +1,6 @@
+# The e2e's hosts file, mounted over the plugin's /etc/hosts (e2e/plugin.yaml):
+# Treasury's site answers nowhere, so the plugin's first check fails as it
+# would offline, and the run never reads the live site.
+127.0.0.1 localhost
+::1 localhost
+127.0.0.1 home.treasury.gov

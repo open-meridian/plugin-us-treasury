@@ -2,44 +2,52 @@
 # Pre-push gate for a plugin: CI-first (ruled 2026-10-13).
 #
 # A plugin's change lands through a pull request: push a branch, open the pull
-# request, and its CI (.github/workflows/check.yaml) is the first line; merge
-# when green. Pushing a branch therefore runs nothing here.
+# request, and its CI (ci, check, e2e) is the first line; merge when green.
+# Pushing a branch therefore runs nothing here. `make ci-local` stays the way
+# to reproduce or debug a CI failure locally.
 #
-# A tag push runs nothing either: a release tag is signed on a main whose CI
-# `meridian plugin release` checked, and publishing it checks it again.
+# A push straight to main skips the pull request, so it still runs the local
+# gate first, promoted to ci-local-deep for a diff touching build inputs,
+# workflow definitions or the wire schema.
 #
-# A push straight to main skips the pull request, so it still runs the
-# plugin's check first: `meridian plugin check --run-tests`, the same check
-# its CI runs.
-#
-# Activate on a fresh clone with:  git config core.hooksPath hooks
-# --no-verify bypasses this. It is not recommended.
+# Activate on a fresh clone with:  make install-hooks
+# --no-verify bypasses this. It is not recommended and settings.json denies it
+# to agent sessions.
 
 set -euo pipefail
 
 to_main=""
-tags=""
 while read -r _local_ref _local_sha remote_ref _remote_sha; do
-  case "$remote_ref" in
-    refs/heads/main) to_main=1 ;;
-    refs/tags/*) tags="$tags ${remote_ref#refs/tags/}" ;;
-  esac
+  [ "$remote_ref" = "refs/heads/main" ] && to_main=1
 done
 
 if [ -z "$to_main" ]; then
-  if [ -n "$tags" ]; then
-    echo "pre-push: a tag push (${tags# }); nothing runs here. \`meridian plugin release\` checked main's CI before signing it, and publishing runs \`meridian plugin check\` before the platform builds it."
-  else
-    echo "pre-push: a branch push; CI on its pull request is the gate (CI-first)."
-  fi
+  echo "pre-push: a branch push; CI on its pull request is the gate (CI-first)."
   exit 0
 fi
 
-cd "$(git rev-parse --show-toplevel)"
-echo "pre-push: a push straight to main; running meridian plugin check --run-tests"
-if ! meridian plugin check --run-tests; then
+RISKY='(^|/)(Dockerfile[^/]*|Makefile|pyproject\.toml|\.github/workflows/)'
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
+if [ -n "$upstream" ]; then
+  changed="$(git diff --name-only "$upstream"...HEAD 2>/dev/null || true)"
+else
+  changed="$(git diff --name-only HEAD 2>/dev/null || true)"
+fi
+
+target="ci-local"
+if echo "$changed" | grep -qE "$RISKY"; then
+  target="ci-local-deep"
+  echo "pre-push: diff touches a risky path, promoting to $target"
+fi
+
+echo "pre-push: a push straight to main; running make $target"
+if ! make "$target"; then
   echo
-  echo "pre-push: BLOCKED -- meridian plugin check --run-tests failed."
+  echo "pre-push: BLOCKED -- make $target failed."
   echo "Land it through a pull request instead, or fix it locally."
   exit 1
 fi

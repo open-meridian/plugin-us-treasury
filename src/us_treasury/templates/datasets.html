@@ -1,1 +1,15 @@
+{#- Datasets, at admin: the data role's (meridian/roles/data/datasets.html),
+    with Treasury's nuance at its blocks only -- what it could not read, how
+    many wants there are past the latest few drawn, and the spec's §5 vendor
+    tabs as columns of "Served", one dataset being one curve: "Records" (the
+    curve's record, or why there is none) and "Lag" (the median time from a
+    day's start to the plugin first reading it); how Treasury is cited on
+    the Record column's heading, and on every row's record. No rate: rates are the reading roles'. -#}
 {% extends "meridian/roles/data/datasets.html" %}
+{% import "meridian/kit.html" as kit %}
+{% block status %}{{ kit.status({"state": state[0], "label": state[1], "detail": state[2], "at": checked_at, "at_label": "Last checked"}) }}{% endblock %}
+{% block vendor_notices %}
+{% if data.unread %}<div class="notice warn" role="status">Treasury stated what the plugin could not read, not recorded: {{ data.unread|join("; ") }}</div>{% endif %}
+{% if wants > data.wants|length %}<p class="muted">The latest {{ data.wants|length }} of {{ wants }} wants are shown.</p>{% endif %}
+{% endblock %}
+{% block vendor_columns %}{% if row is none %}<th title="{{ data.attribution }}">Record</th><th class="wide-only">Lag</th>{% else %}{% set r = data.records|selectattr("dataset", "equalto", row.dataset)|first %}{% set lag = data.lag|selectattr("dataset", "equalto", row.dataset)|first %}<td data-dataset="{{ row.dataset }}" title="{{ r.code }}: {{ r.rows }}. {{ data.attribution }}">{% if r.instrument_id %}<code>{{ r.instrument_id }}</code>{% else %}<span class="badge warn">{{ r.miss or "not yet resolved" }}</span>{% endif %}</td><td class="wide-only" title="{{ lag.said }}">{{ lag.median if lag and lag.days else "None yet" }}</td>{% endif %}{% endblock %}
