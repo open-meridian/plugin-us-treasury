@@ -1,0 +1,221 @@
+"""The data suite: the role's requirement, which this plugin holds itself to.
+
+A plugin holding `data` is verified for it only by passing every case of the
+suite the SDK carries, and `meridian plugin check --verified` fails one with
+no test running it. Each case says, in the contract's words, what the
+vendor presents and what the plugin sends. Here each is mapped to one of the
+vendor's responses (vendor.py), run through the plugin's own conversion
+(convert.py), against a `Recorder`: the plugin's typed operations, recorded
+rather than sent, answered as a sidecar answers them in the ordinary case,
+or as `answer` says for the case.
+
+When you replace the stand-in vendor with your own, map each case to a
+recorded or synthetic exchange with it, and keep every case passing.
+
+A case about a kind of data (its `about`) the plugin declares it never
+publishes is not presented, with why, rather than mapped: this plugin's one
+dataset is daily closes and bars (declaration.py), so it states no trades,
+no quotes, no event contract's outcomes and no rates, and it is pulled,
+never streamed. Declare a dataset of trades, quotes, outcomes or rates, or
+stream one, and those cases are required again, and fail until each is
+mapped. From contract v27 the lake's bounded query is about trades too: a
+plugin recording none marks it not presented.
+"""
+
+from __future__ import annotations
+
+from typing import cast
+
+import meridian
+from meridian.plugin.v1 import operations_pb2 as ops
+from meridian.suites import Producer, Recorder, run, suite
+
+from us_treasury.convert import Converter
+from us_treasury.declaration import DECLARATION
+from us_treasury.vendor import DAILY, FORMING
+
+INSTANCE = "reference-1"
+DAY = 1_791_417_600_000_000_000  # 2026-10-09 00:00 UTC, when the lake asks
+
+
+def converter(recorder: Recorder) -> Converter:
+    return Converter(cast(meridian.Plugin, recorder))
+
+
+def daily(symbol: str) -> Producer:
+    """The vendor's candle for `symbol`, converted and recorded."""
+
+    async def produce(recorder: Recorder) -> None:
+        await converter(recorder).record_daily(symbol, DAILY[symbol])
+
+    return produce
+
+
+async def forming(recorder: Recorder) -> None:
+    for text in FORMING:
+        await converter(recorder).record_daily("BTC-USD", text)
+
+
+async def ambiguous(recorder: Recorder) -> None:
+    # The vendor's symbol meets two of the deployment's records.
+    recorder.answer(
+        "ResolveIdentifier",
+        lambda _: ops.ResolveIdentifierResult(
+            found=False, miss_reason=ops.MISS_REASON_AMBIGUOUS
+        ),
+    )
+    await converter(recorder).record_daily("BTC-USD", DAILY["BTC-USD"])
+
+
+async def venue_not_held(recorder: Recorder) -> None:
+    recorder.answer(
+        "ResolveVenue",
+        lambda _: ops.ResolveVenueResult(found=False, miss_reason=ops.MISS_REASON_NOT_FOUND),
+    )
+    await converter(recorder).record_daily("QQQ", DAILY["QQQ"])
+
+
+def wanted(symbol: str | None) -> Producer:
+    """The lake wanting a business date's closes for the instrument `symbol`
+    resolved to; for one the vendor does not serve, with None."""
+
+    async def produce(recorder: Recorder) -> None:
+        plugin = converter(recorder)
+        await plugin.map_products(DAY)
+        subject = next(
+            (held for held, served in plugin.products.items() if served == symbol),
+            "LCL-NOT-SERVED",
+        )
+        want = ops.ObservationsWantedEvent(
+            want_id="WNT-1",
+            dataset=f"{INSTANCE}:daily",
+            data_type="meridian.v1.Price",
+            subjects=[ops.SubjectRef(entity_id=subject)],
+            kinds=[ops.PRICE_KIND_CLOSE],
+            business_date="2026-10-08",
+        )
+        recorder.answer("ObservationsWanted", lambda _: want)
+        await recorder.receive(observations_wanted=plugin.on_want)
+
+    return produce
+
+
+async def elsewhere(recorder: Recorder) -> None:
+    """The lake wanting a close for an instrument another source resolved --
+    a custodian's QQQ, known by its symbol and a CUSIP -- which this plugin
+    never resolved: it reads the record and serves its own symbol."""
+    plugin = converter(recorder)
+    subject = "LCL-HELD-ELSEWHERE"
+    recorder.answer(
+        "ResolveInstrument",
+        lambda _: ops.ResolveInstrumentResult(
+            found=True,
+            instrument=ops.InstrumentRecord(
+                instrument_id=subject,
+                identifiers=[
+                    ops.Identifier(scheme="cusip", value="46090E103"),
+                    ops.Identifier(scheme="symbol", value="QQQ", source="custodian"),
+                ],
+            ),
+        ),
+    )
+    want = ops.ObservationsWantedEvent(
+        want_id="WNT-1",
+        dataset=f"{INSTANCE}:daily",
+        data_type="meridian.v1.Price",
+        subjects=[ops.SubjectRef(entity_id=subject)],
+        kinds=[ops.PRICE_KIND_CLOSE],
+        business_date="2026-10-08",
+    )
+    recorder.answer("ObservationsWanted", lambda _: want)
+    await recorder.receive(observations_wanted=plugin.on_want)
+
+
+async def withdrawn(recorder: Recorder) -> None:
+    plugin = converter(recorder)
+    recorder.answer(
+        "WantWithdrawn",
+        lambda _: [ops.WantWithdrawnEvent(want_id="WNT-1", dataset=f"{INSTANCE}:daily")],
+    )
+    await recorder.receive(want_withdrawn=plugin.on_withdrawn)
+
+
+async def licences(recorder: Recorder) -> None:
+    # On start (contract v20): its own declared datasets' licences.
+    await converter(recorder).read_licences()
+
+
+# The settlement calendars' reads every role holds (contract v22): a plugin
+# needing a calendar's days or a settlement date asks core, the deployment's
+# one answer, and never works one out itself.
+async def reads_a_calendar(recorder: Recorder) -> None:
+    await recorder.read_calendar(
+        calendar_id="CAL-01JAE0000000000000000USSS",
+        from_date="2026-10-01",
+        to_date="2026-10-31",
+    )
+
+
+async def asks_for_a_settlement_date(recorder: Recorder) -> None:
+    await recorder.compute_date(
+        settlement=ops.SettlementDateInputs(instrument_id="LCL-1", trade_date="2026-10-09")
+    )
+
+
+PRODUCERS: dict[str, Producer] = {
+    "a-daily-close": daily("BTC-USD"),
+    "the-forming-day-restated": forming,
+    "an-exact-price": daily("SHIB-USD"),
+    "a-daily-bar": daily("BTC-USD"),
+    "an-fx-rate": daily("EUR-USD"),
+    "a-stablecoin-quote": daily("ETH-USDC"),
+    "an-asset-that-does-not-resolve": ambiguous,
+    "a-venue-resolved": daily("QQQ"),
+    "a-venue-not-held": venue_not_held,
+    "a-want-recorded-against": wanted("BTC-USD"),
+    "a-subject-another-source-resolved": elsewhere,
+    "a-subject-declined": wanted(None),
+    "a-standing-want-withdrawn": withdrawn,
+    "reads-its-datasets-licences": licences,
+    "reads-a-calendar": reads_a_calendar,
+    "asks-for-a-settlement-date": asks_for_a_settlement_date,
+}
+
+
+#: Each kind of data a case may be about that is one of the lake's data
+#: types, by its message: a case about one the catalogue does not declare is
+#: about something this plugin never publishes.
+KINDS = {
+    "trades": "meridian.v1.Trade",
+    "quotes": "meridian.v1.Quote",
+    "outcomes": "meridian.v1.Outcome",
+    "disputed outcomes": "meridian.v1.Outcome",
+    "rates": "meridian.v1.Rate",
+}
+DECLARED = {kind for dataset in DECLARATION.catalogue for kind in dataset.data_types}
+STREAMED = any(
+    mode == ops.OBSERVATION_MODE_STREAM
+    for dataset in DECLARATION.catalogue
+    for mode in dataset.modes
+)
+
+NOT_PRESENTED: dict[str, str] = {
+    case.name: f"its datasets publish daily closes and bars, and no {case.about}"
+    for case in suite("data").cases
+    if case.about in KINDS and KINDS[case.about] not in DECLARED
+}
+if not STREAMED:
+    NOT_PRESENTED["records-a-datasets-liveness"] = (
+        "its datasets are pulled when wanted, never streamed"
+    )
+# Ruling 518: a case about `latency` (its feed delay) waits for contract v28.
+# The SDK records each row's age at the edge (`Wants.latency`) and sends no
+# ReportLatency yet.
+for case in suite("data").cases:
+    if case.about == "latency":
+        NOT_PRESENTED[case.name] = "core receives ReportLatency from contract v28, ruling 515"
+
+
+def test_every_case_of_the_data_suite_passes() -> None:
+    report = run("data", PRODUCERS, not_presented=NOT_PRESENTED, instance_id=INSTANCE)
+    assert report.passed, report.failures
