@@ -21,13 +21,13 @@ A case about what Treasury never states (`about`) is not presented, with
 why: every case a rates-only plugin never presents, as the SDK names them
 (`meridian.roles.data.testing.RATES_NOT_PRESENTED`, ruling 538) -- prices
 (`an-exact-price` and `a-want-recorded-against` among them, about closes
-from ruling 537), trades, quotes, outcomes, a stream's liveness, and the
-feed delay, about `latency` until contract v28 (ruling 518); then
+from ruling 537), trades, quotes, outcomes, and the feed delay, about
+`latency` until contract v28 (ruling 518); then
 Treasury's own: a reference rate's fixing and an index level (the NY Fed's
 and the ECB's), a single-point series of another source's curve (FRED's),
-settlement dates, and `reads-a-calendar`, since its datasets declare no
-calendar until one of the US government securities market is curated (the
-spec's Q15).
+a stream's liveness (it records none), settlement dates, and
+`reads-a-calendar`, since its datasets declare no calendar until one of the
+US government securities market is curated (the spec's Q15).
 """
 
 from __future__ import annotations
@@ -61,6 +61,9 @@ TREASURY_NEVER = {
     "reads-a-calendar": (
         "its datasets declare no calendar until one of the US government securities market "
         "is curated (the spec's Q15); it expects Monday to Friday"
+    ),
+    "records-a-datasets-liveness": (
+        "it reads Treasury's files hourly and streams nothing; it records no liveness"
     ),
     "asks-for-a-settlement-date": (
         "records each day's rates as published; never computes a settlement date"

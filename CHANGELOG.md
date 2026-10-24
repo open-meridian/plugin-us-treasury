@@ -3,7 +3,7 @@
 ## 0.1.0
 
 The US Treasury's daily interest rates as a data plugin, on the lake's rates
-slice (contract v27, SDK 0.32.1; spec/a-public-rates-and-filings-data-plugin,
+slice (contract v27, SDK 0.32.2; spec/a-public-rates-and-filings-data-plugin,
 `plugin-us-treasury`, rulings 343 to 349).
 
 - Three datasets of rates: `ust_par` (the par yield curve), `ust_real` (the
@@ -17,7 +17,9 @@ slice (contract v27, SDK 0.32.1; spec/a-public-rates-and-filings-data-plugin,
 - Pushed hourly from the current months, a correction the same row's next
   version; each curve's history read back on the first run, to 1990, 2003
   and 2002; a past day pulled when the lake wants it.
-- Raw responses kept from day one, as the SDK's storage settings say.
+- Raw responses kept from day one, as the SDK's storage settings say; each
+  rate names the answer it was first read from, so a rate read again is the
+  same row.
 - The data role's Connection (with Sources) and Datasets (with Lag and
   Records), each a read tool; terms as US government work.
 - The data suite at v27: the rates cases Treasury presents mapped, the rest

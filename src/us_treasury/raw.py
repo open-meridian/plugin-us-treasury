@@ -19,6 +19,17 @@ deleted (`plugin.delete_unit`, which a deployment's hold refuses, keeping
 it) or kept. The current months are read hourly, about 4 kB gzipped each,
 so a year of answers is some 100 MB, and the window defaults to ten years.
 
+**Where a rate was first read.** A rate read again -- the next check of the
+current months, the history's read of the current year, a reader's want, a
+restart -- names the answer it was first read from, never the newest copy:
+the lake compares a row's raw record too, so a new reference would make
+every rate read again its row's next version. Which answer first held each
+rate, by what Treasury stated (its file, kind, tenor, column, day and
+value), is noted under `firsts/<YYYY-MM>.json` at the storage's root, a file
+per month of the rates' days. A corrected value is noted afresh, naming the
+answer that corrected it; a noted answer storage no longer holds is noted
+afresh too.
+
 **The history read** (`history.json` at the storage's root): each curve's
 past years read whole, so a restart reads on from where the last one
 stopped, and a new container with the same storage reads none of them
@@ -37,7 +48,7 @@ import logging
 import tempfile
 from collections.abc import Iterator
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -55,6 +66,8 @@ DEFAULT_WINDOW_DAYS = 3650
 MOST_WINDOW_DAYS = 36500
 #: Where each curve's history read is noted, at the storage's root.
 HISTORY = "history.json"
+#: Where each rate's first answer is noted, at the storage's root.
+FIRSTS = "firsts"
 
 _SHORT = {
     "daily_treasury_yield_curve": "par",
@@ -91,6 +104,8 @@ class RawStore:
         granted = root if root is not None else edge.storage_dir()
         self.granted = granted is not None
         self.root = Path(granted) if granted is not None else Path(tempfile.mkdtemp(prefix="ust-"))
+        self._firsts: dict[str, dict[str, str]] = {}
+        self._changed: set[str] = set()
 
     def keep(self, fetched: Fetched) -> str:
         """Keep an answer before anything is read from it; its key."""
@@ -110,6 +125,42 @@ class RawStore:
         partial.write_bytes(gzip.compress(json.dumps(document).encode(), mtime=0))
         partial.replace(target)
         return key
+
+    # ── Where each rate was first read ──────────────────────────────────
+
+    def first(self, said: str, day: date, key: str) -> str:
+        """The key of the answer a rate -- `said`, what Treasury stated of it,
+        its value among it -- was first read from, noting `key`, the answer it
+        is read from now, where none is noted or storage no longer holds it."""
+        month = f"{day:%Y-%m}"
+        noted = self._month(month)
+        held = noted.get(said)
+        if held and (self.root / held).is_file():
+            return held
+        noted[said] = key
+        self._changed.add(month)
+        return key
+
+    def save_firsts(self) -> None:
+        """Write the months noted since the last save."""
+        for month in sorted(self._changed):
+            target = self.root / FIRSTS / f"{month}.json"
+            target.parent.mkdir(parents=True, exist_ok=True)
+            partial = target.with_suffix(".partial")
+            partial.write_text(json.dumps(self._firsts[month], sort_keys=True, indent=0))
+            partial.replace(target)
+        self._changed.clear()
+
+    def _month(self, month: str) -> dict[str, str]:
+        held = self._firsts.get(month)
+        if held is None:
+            try:
+                read = json.loads((self.root / FIRSTS / f"{month}.json").read_text())
+            except (OSError, ValueError):
+                read = {}
+            held = {str(k): str(v) for k, v in read.items()} if isinstance(read, dict) else {}
+            self._firsts[month] = held
+        return held
 
     # ── The history read ────────────────────────────────────────────────
 

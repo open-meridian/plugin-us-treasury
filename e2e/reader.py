@@ -57,7 +57,7 @@ class Reader:
 
     async def curve(self, query):
         one = lambda name: query.get(name, [""])[0]  # noqa: E731
-        sources = SourceChoice(named=one("dataset")) if one("dataset") else None
+        sources = SourceChoice(named=[one("dataset")]) if one("dataset") else None
         read = await rates.read_curve(self.plugin, one("subject"), one("date"), sources=sources)
         # What the lake left unanswered, asked once more for it alone.
         answer = await self.plugin.list_rates(

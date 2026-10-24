@@ -202,6 +202,9 @@ class Feed:
             self.status = Status(mode=source.mode, started_at=self.now())
             self._digests.clear()
             self._current_year_read.clear()
+            # A record missed reading the other source is asked again now,
+            # not tomorrow: what was missing then may be held.
+            self.rates.missed.clear()
 
     # ── Reading Treasury ────────────────────────────────────────────────
 
@@ -243,7 +246,9 @@ class Feed:
         days: Iterable[date] | None = None,
     ) -> list[Rate]:
         """The rates `read` states for `subject`, on `days` where given: one
-        row per point, never one for a tenor left empty."""
+        row per point, never one for a tenor left empty. Each names the
+        answer it was first read from (raw.py), so a rate read again -- the
+        next check, the history, a want, a restart -- is the same row."""
         wanted = set(days) if days is not None else None
         made: list[Rate] = []
         for day in read.days:
@@ -251,6 +256,10 @@ class Feed:
                 continue
             for point in day.points:
                 column = point.column
+                said = (
+                    f"{curve.key}:{column.kind}:{column.tenor}:{column.header}:"
+                    f"{day.day.isoformat()}={point.text}"
+                )
                 made.append(
                     self.rates.rate(
                         subject,
@@ -261,9 +270,10 @@ class Feed:
                         convention=column.convention,
                         tenor=column.tenor,
                         series=curve.key,
-                        raw_key=key,
+                        raw_key=self.raw.first(said, day.day, key),
                     )
                 )
+        self.raw.save_firsts()
         return made
 
     async def record(
@@ -369,6 +379,11 @@ class Feed:
             held = self.status.sources[curve.key]
             done = set(noted.get(curve.key, []))
             held.history_years = sorted(done)
+            if held.read_at is None:
+                # Treasury not read yet: the history waits for the current
+                # months, and resolves nothing before them.
+                held.history_error = "waiting for Treasury to answer"
+                continue
             if not await self.subject(curve):
                 held.history_error = "waiting for the curve's record to resolve"
                 continue

@@ -14,9 +14,9 @@ So, as spec/a-public-rates-and-filings-data-plugin §5 has them:
   limit, the requests made, the last check and error, and **Sources** as
   one row of it, each file in its detail: its state, the last day
   published, the next expected, its calls, its last error, its tenors and
-  how far its history is read back; "Stream": it does not stream;
-  "Sessions". The role's four sections fill most of a screen, so Sources is
-  a row of the one whose calls it divides, not a section of its own.
+  how far its history is read back; "Stream": it does not stream. A
+  section of its own, even paged, does not fit one screen beside the role's
+  sections, so Sources is a row of the one whose calls it divides.
 - **Datasets** (`/datasets`): "Served", with **Records** (the curve's record
   or why there is none) and **Lag** as columns of it, one dataset being one
   curve; "Wants" and "Subjects".

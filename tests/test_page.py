@@ -48,11 +48,13 @@ def test_each_page_is_managed_alone(client: PageClient) -> None:
 def test_connection_says_how_treasury_is_reached(client: PageClient) -> None:
     text = client.get(CONNECTION, "admin").text
     # The data role's sections, in its order, Treasury's Sources a row of
-    # "Limits and use" (one screen beside the role's four sections).
+    # "Limits and use" (one screen beside the role's sections). No Sessions:
+    # the plugin holds none (SDK 0.32.2).
     assert text.index("<h2>Key</h2>") < text.index("<h2>Limits and use</h2>")
     assert text.index("<h2>Limits and use</h2>") < text.index('<th scope="row">Sources</th>')
     assert text.index('<th scope="row">Sources</th>') < text.index("<h2>Stream</h2>")
     assert "3 of 3 answering, latest Thu 22 Oct" in text
+    assert "<h2>Sessions</h2>" not in text
     assert 'state="ok"' in text and "Sample data" in text
     assert "No key needed" in text and "Does not stream" in text
     assert text.count("<dt data-source=") == 3

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import gzip
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -102,7 +102,9 @@ class Corrected(SyntheticTreasury):
         line = "10/22/2026,4.11,4.10,4.16,4.22,4.29,4.29,4.41,4.65,4.72,4.78,4.86,4.96,"
         body = got.text.replace(line, line[:-5] + "4.97,")
         assert body != got.text
-        return Fetched(path, 200, body.encode(), got.fetched_at, got.date)
+        # Read a second later, so kept under a key of its own.
+        later = got.fetched_at + timedelta(seconds=1)
+        return Fetched(path, 200, body.encode(), later, got.date)
 
 
 def feed(tmp: Path, plugin: Any = None, at: datetime = AT, source: Any = None) -> Feed:

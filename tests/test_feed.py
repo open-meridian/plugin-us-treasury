@@ -135,6 +135,7 @@ async def test_the_history_read_back_to_each_first_year(tmp_path: Path) -> None:
     assert "2002-12-31" in bills
     # A new process on the same storage reads only the current year again.
     later = Feed(work.plugin, Recorded(), RawStore(tmp_path), now=lambda: AT)
+    await later.check()
     assert await later.history() == 3
 
 
@@ -146,6 +147,7 @@ async def test_a_history_that_fails_stops_and_reads_on_later(tmp_path: Path) -> 
             return await super().get(path)
 
     work = feed(tmp_path, source=Fails())
+    await work.check()
     await work.history()
     par = work.status.sources["ust_par"]
     assert not par.history_done and par.history_from == 2011
@@ -165,6 +167,10 @@ async def test_treasury_not_reached_is_said(tmp_path: Path) -> None:
     assert all(o.sent == 0 for o in done.values())
     assert "ConnectionRefusedError" in work.status.error
     assert not work.plugin.on("RecordRates")
+    # The history waits for Treasury, and resolves nothing before it answers.
+    assert await work.history() == 0
+    assert not work.plugin.on("ResolveIdentifier")
+    assert work.status.sources["ust_par"].history_error == "waiting for Treasury to answer"
 
 
 async def test_a_day_wanted_is_recorded_against_the_want(tmp_path: Path) -> None:
@@ -248,3 +254,29 @@ async def test_a_day_first_read_while_watching_has_its_lag(tmp_path: Path) -> No
 def test_the_next_day_expected_is_a_weekday() -> None:
     assert next_weekday(date(2026, 10, 22)) == date(2026, 10, 23)
     assert next_weekday(date(2026, 10, 23)) == date(2026, 10, 26)
+
+
+async def test_a_rate_read_again_names_the_answer_it_was_first_read_from(tmp_path: Path) -> None:
+    work = feed(tmp_path)
+    await work.check()
+    first = {r.meta.row_key: r.meta.raw.key for r in rows(work.plugin)}
+    # The history reads the current year again, a restart reads it all again:
+    # each rate names the same answer, so the lake answers it unchanged.
+    await work.history()
+    later = Feed(work.plugin, Recorded(), RawStore(tmp_path), now=lambda: AT)
+    await later.check()
+    again = [r for r in rows(work.plugin) if r.meta.row_key in first]
+    assert len(again) > len(first)
+    assert all(r.meta.raw.key == first[r.meta.row_key] for r in again)
+    assert all(o.restated == 0 for o in (await later.check()).values())
+
+
+async def test_a_corrected_rate_names_the_answer_that_corrected_it(tmp_path: Path) -> None:
+    work = feed(tmp_path, source=Corrected())
+    await work.check()
+    before = {r.meta.row_key: r.meta.raw.key for r in rows(work.plugin)}
+    await work.check()
+    batch = work.plugin.on("RecordRates")[-1].rates
+    changed = [r for r in batch if r.meta.raw.key != before[r.meta.row_key]]
+    assert [rates.tenor_label(r.tenor) for r in changed] == ["10Y"]
+    assert changed[0].meta.business_date == "2026-10-22"

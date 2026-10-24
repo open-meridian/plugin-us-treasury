@@ -21,7 +21,7 @@ How the plugin reaches Treasury, and how the last check went:
   -- with its state, last day published, next day expected, calls, how far
   its history is read back, the tenors its latest day states and its last
   error; then the calendar and how many answers are kept;
-- **Stream:** it does not stream; **Sessions**, none.
+- **Stream:** it does not stream.
 
 ## Datasets (`read_datasets`)
 

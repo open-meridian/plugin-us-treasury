@@ -1,7 +1,7 @@
 # meridian-us-treasury
 
 The US Treasury's daily interest rates as an Open Meridian data plugin, in
-Python on the open-meridian SDK (0.32.1, contract v27). It runs beside a
+Python on the open-meridian SDK (0.32.2, contract v27). It runs beside a
 sidecar in a Meridian deployment and puts each business day's par yield
 curve, real par yield curve and bill rates into the deployment's lake as
 rates (the lake's rates slice), each curve one referential record and its
@@ -56,7 +56,9 @@ publisher's feed).
 - **Every subject resolved first,** by Treasury's title as a `symbol` under
   `ustreasury` (the platform's seeded referential records), as of now; a
   miss reported with its reason, never a record minted here.
-- **Every row names its raw record,** kept before anything is read from it.
+- **Every row names its raw record,** kept before anything is read from it,
+  and the same rate always names the answer it was first read from (raw.py's
+  `first`): the lake would make a new reference the row's next version.
 - **Stateless.** The process holds nothing it cannot lose: a restart reads
   Treasury again and the lake answers what it recorded before unchanged; the
   history read is noted in storage, so a restart reads on from there.
