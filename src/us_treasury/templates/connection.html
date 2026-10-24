@@ -1,6 +1,18 @@
+{#- Connection, at admin: the data role's (meridian/roles/data/connection.html),
+    with Treasury's nuance at its blocks only -- the head's status, and
+    "Sources" (the spec's §5) as one row of "Limits and use", whose calls
+    and errors it divides by file: a section of its own, even paged, does not
+    fit one screen at 375 by 812 or 1280 by 800 beside the role's sections: its detail gives each file -- its state, last
+    release, next expected, calls, history, tenors and last error -- then
+    the calendar and the answers kept. No rate: rates are the reading
+    roles'. -#}
 {% extends "meridian/roles/data/connection.html" %}
-{#- The vendor's nuance, at the role's blocks only: here, a section naming
-    the vendor after the common ones. -#}
-{% block vendor_sections %}
-<section class="panel"><h2>Reference vendor</h2><p class="muted">A stand-in vendor serving daily candles; replace it with your own.</p></section>
-{% endblock %}
+{% import "meridian/kit.html" as kit %}
+{% block status %}{{ kit.status({"state": data.state, "label": data.said, "detail": detail, "at": data.checked_at, "at_label": "Last checked"}) }}{% endblock %}
+{% block vendor_rows %}{% if section == "Limits and use" %}
+{% set latest = data.sources|map(attribute="last_release")|select|max %}
+{% set answering = data.sources|selectattr("state", "equalto", "Answering")|list|length %}
+<tr data-sources="{{ data.sources|length }}"><th scope="row">Sources</th><td>{{ answering }} of {{ data.sources|length }} answering{% if latest %}, latest {{ latest|day }}{% endif %}</td><td class="more"><details class="row-detail" name="facts"><summary aria-label="Details of Sources">…</summary><div class="row-detail-pop"><h3>Sources</h3><dl>
+{% for s in data.sources %}<dt data-source="{{ s.dataset }}">{{ s.source }}</dt><dd>{{ s.state }}; last release {{ (s.last_release|day) if s.last_release else "not yet" }}; next expected {{ (s.next_expected|day) if s.next_expected else "not known" }}; {{ s.calls }} calls; {{ s.history[:1]|lower ~ s.history[1:] }}; tenors {{ s.tenors|join(", ") if s.tenors else "none read yet" }}; last error {{ s.last_error or "none" }}</dd>
+{% endfor %}<dt>Calendar</dt><dd>{{ data.calendar }}</dd><dt>Answers kept</dt><dd>{{ data.responses_kept }}{% if data.kept_for %}, {{ data.kept_for }}{% endif %}</dd></dl></div></details></td></tr>
+{% endif %}{% endblock %}

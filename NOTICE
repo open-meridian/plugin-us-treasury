@@ -1,0 +1,9 @@
+meridian-us-treasury
+Copyright 2026 Societal Lab Inc.
+
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+The data this plugin reads are the US Department of the Treasury's daily
+Treasury rates, published on its website. They are a work of the US
+government. This project is not affiliated with or endorsed by the US
+Department of the Treasury.

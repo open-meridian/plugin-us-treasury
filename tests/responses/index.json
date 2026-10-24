@@ -1,0 +1,21 @@
+{
+  "said": "The US Treasury's real answers, recorded 2026-10-23 for the tests: the par yield curve of February 2025, when the 1.5-month tenor was first published (18 February), and the bill rates of 2002, when Treasury issued no 52-week bill. US government work.",
+  "responses": [
+    {
+      "type": "daily_treasury_yield_curve",
+      "month": "202502",
+      "file": "par-202502.csv.gz",
+      "path": "/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202502?type=daily_treasury_yield_curve&field_tdr_date_value_month=202502&page&_format=csv",
+      "status": 200,
+      "date": "Fri, 23 Oct 2026 16:45:33 GMT"
+    },
+    {
+      "type": "daily_treasury_bill_rates",
+      "year": "2002",
+      "file": "bills-2002.csv.gz",
+      "path": "/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/2002/all?type=daily_treasury_bill_rates&field_tdr_date_value=2002&page&_format=csv",
+      "status": 200,
+      "date": "Fri, 23 Oct 2026 16:45:52 GMT"
+    }
+  ]
+}

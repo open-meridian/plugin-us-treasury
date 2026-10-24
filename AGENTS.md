@@ -1,4 +1,92 @@
-# us-treasury
+# meridian-us-treasury
+
+The US Treasury's daily interest rates as an Open Meridian data plugin, in
+Python on the open-meridian SDK (0.32.2, contract v27). It runs beside a
+sidecar in a Meridian deployment and puts each business day's par yield
+curve, real par yield curve and bill rates into the deployment's lake as
+rates (the lake's rates slice), each curve one referential record and its
+points rows. What it may publish and subscribe to comes from its one role,
+`data`, declared in `pyproject.toml`, once a deployment admin approves it.
+It is meridian-design's `spec/a-public-rates-and-filings-data-plugin.md`,
+its `plugin-us-treasury` section (rulings 343 to 349 made it one plugin per
+publisher's feed).
+
+## What it is
+
+- `src/us_treasury/treasury.py` asks Treasury's site one kind of request,
+  one of the daily Treasury rates files as CSV for a month or a year, with
+  the standard library, one at a time, at most one every two seconds;
+  `SyntheticTreasury` answers from the real answers committed under
+  `src/us_treasury/responses/`.
+- `src/us_treasury/curves.py` names the three files (`ust_par`, `ust_real`,
+  `ust_bills`) and the records they are about, and reads a file's CSV: each
+  column's tenor as Treasury labels it, its kind and convention, each value
+  as written; a value that is not a number, or a column not known, kept as
+  not read.
+- `src/us_treasury/feed.py` makes each point a `Rate` through the SDK's
+  `meridian.roles.data.rates` (`Feed.subject`, `Feed.rate`, `Feed.record`;
+  ruling 345), pushes the current months hourly, reads each curve's history
+  back on the first run, and answers the lake's wants or declines them
+  (W10.7) through the SDK's `meridian.roles.data.Wants`.
+- `src/us_treasury/raw.py` keeps every answer as received in the storage the
+  deployment grants, notes the history read, and moves months past their
+  window as the SDK's settings say.
+- `src/us_treasury/page.py`, `records.py` and `templates/` are the data
+  role's two pages under Manage (spec/plugin-pages-follow-their-role),
+  Connection and Datasets, each a read tool (`read_connection`,
+  `read_datasets`) on the deployment's MCP answering the role's common
+  fields, `meridian.roles.data`'s records extended with Treasury's (Sources;
+  Lag and Records). The templates extend the role's and add Treasury's
+  nuance at its blocks alone (`vendor_notices`, `vendor_rows`,
+  `vendor_columns`, `vendor_sections`): never rename, reorder or drop a
+  common section, row, column or label.
+
+## The rules it keeps
+
+- **A data plugin shows no value.** Its pages show its connection, its
+  datasets and how its subjects resolve; a rate is the reading roles' to
+  show. A test holds every page to it.
+- **Exact decimals.** A rate is made a `Decimal` from the text Treasury
+  wrote, never a `float`; `4.96` stays `4.96` per cent.
+- **Nothing guessed.** A tenor Treasury left empty is no row, never a zero;
+  no curve is fitted or interpolated; no publication time is invented
+  (Treasury states none). The one tenor that is not whole, the par curve's
+  `1.5 Month`, is the six-week bill's point, recorded as `6W`; the bills keep
+  Treasury's weeks.
+- **Every subject resolved first,** by Treasury's title as a `symbol` under
+  `ustreasury` (the platform's seeded referential records), as of now; a
+  miss reported with its reason, never a record minted here.
+- **Every row names its raw record,** kept before anything is read from it,
+  and the same rate always names the answer it was first read from (raw.py's
+  `first`): the lake would make a new reference the row's next version.
+- **Stateless.** The process holds nothing it cannot lose: a restart reads
+  Treasury again and the lake answers what it recorded before unchanged; the
+  history read is noted in storage, so a restart reads on from there.
+- **Real answers are committed:** Treasury's data are US government work.
+  Record a new one with `curl` from Treasury's site, gzip it into
+  `src/us_treasury/responses/` (sample data) or `tests/responses/` (a test's
+  alone), and describe it in its `index.json` with its Date header.
+- **The suite.** `tests/test_suite.py` runs `meridian.suites.run("data", ...)`
+  on the plugin's own conversion: the rates cases Treasury presents (a curve
+  for a date, a tenor not published, two conventions for one tenor, a
+  revision) mapped, and every case about a kind of data it never states named
+  in `NOT_PRESENTED` with why: the SDK's `RATES_NOT_PRESENTED` (ruling 538),
+  then Treasury's own (a fixing, an index level, another source's point, a
+  calendar, a settlement date). Its test asserts the report passed.
+  Never write a producer that invents what Treasury does not state.
+
+## Checking it locally
+
+    make ci-local                     # lint, tests, plugin check, image, e2e: the pre-push gate
+    make preview SHOTS=/tmp/shots     # each page in a browser with the kit, at 375, 582 and 1280 px
+
+`make e2e` runs the plugin on core's plugin harness beside a reading plugin
+(`e2e/reader.py`), Treasury's site unreachable (`e2e/hosts`) until sample
+data is on, and compares the lake with `e2e/expected.lake`. Every gate runs
+in a container: the host needs only Docker and Python 3 for the e2e's
+runner.
+
+## Every Meridian plugin's rules
 
 A Meridian plugin, in Python on the open-meridian SDK. It runs beside a
 sidecar in a Meridian deployment and reaches nothing else: what it may publish

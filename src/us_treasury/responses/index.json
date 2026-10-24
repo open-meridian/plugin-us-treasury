@@ -1,0 +1,54 @@
+{
+  "said": "The US Treasury's real answers, recorded 2026-10-23 by meridian-us-treasury's author: each daily Treasury rates file (the par yield curve, the real par yield curve and the bill rates) for September and October 2026, as CSV, the body gzipped. Treasury's data are US government work. Sample data answers each month as recorded and each year with the recorded rows in it; the tests read them.",
+  "last_day": "2026-10-22",
+  "responses": [
+    {
+      "type": "daily_treasury_yield_curve",
+      "month": "202609",
+      "file": "par-202609.csv.gz",
+      "path": "/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?type=daily_treasury_yield_curve&field_tdr_date_value_month=202609&page&_format=csv",
+      "status": 200,
+      "date": "Fri, 23 Oct 2026 16:43:29 GMT"
+    },
+    {
+      "type": "daily_treasury_yield_curve",
+      "month": "202610",
+      "file": "par-202610.csv.gz",
+      "path": "/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202610?type=daily_treasury_yield_curve&field_tdr_date_value_month=202610&page&_format=csv",
+      "status": 200,
+      "date": "Fri, 23 Oct 2026 16:43:48 GMT"
+    },
+    {
+      "type": "daily_treasury_real_yield_curve",
+      "month": "202609",
+      "file": "real-202609.csv.gz",
+      "path": "/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?type=daily_treasury_real_yield_curve&field_tdr_date_value_month=202609&page&_format=csv",
+      "status": 200,
+      "date": "Fri, 23 Oct 2026 16:44:10 GMT"
+    },
+    {
+      "type": "daily_treasury_real_yield_curve",
+      "month": "202610",
+      "file": "real-202610.csv.gz",
+      "path": "/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202610?type=daily_treasury_real_yield_curve&field_tdr_date_value_month=202610&page&_format=csv",
+      "status": 200,
+      "date": "Fri, 23 Oct 2026 16:44:32 GMT"
+    },
+    {
+      "type": "daily_treasury_bill_rates",
+      "month": "202609",
+      "file": "bills-202609.csv.gz",
+      "path": "/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202609?type=daily_treasury_bill_rates&field_tdr_date_value_month=202609&page&_format=csv",
+      "status": 200,
+      "date": "Fri, 23 Oct 2026 16:44:52 GMT"
+    },
+    {
+      "type": "daily_treasury_bill_rates",
+      "month": "202610",
+      "file": "bills-202610.csv.gz",
+      "path": "/resource-center/data-chart-center/interest-rates/daily-treasury-rates.csv/all/202610?type=daily_treasury_bill_rates&field_tdr_date_value_month=202610&page&_format=csv",
+      "status": 200,
+      "date": "Fri, 23 Oct 2026 16:45:12 GMT"
+    }
+  ]
+}
