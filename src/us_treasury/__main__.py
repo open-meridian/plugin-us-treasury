@@ -140,6 +140,8 @@ async def run() -> None:
             asyncio.create_task(check(feed, wake)),
             asyncio.create_task(tend(plugin, feed, held)),
             asyncio.create_task(licences(plugin, feed)),
+            # Contract v28: the feed delay, reported (ReportLatency).
+            asyncio.create_task(feed.latency.run()),
         ]
         for task in tasks:
             task.add_done_callback(_said)

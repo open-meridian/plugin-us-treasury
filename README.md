@@ -17,6 +17,14 @@ named by Treasury's title (`ustreasury:Daily Treasury Par Yield Curve
 Rates` and the others), and its points are rows, each with its tenor as
 Treasury labels it. A tenor Treasury leaves empty is no row, never a zero.
 
+Treasury states no publication time. From 0.2.0 a day that appears in an
+hourly read on its own day, the read before (within 70 minutes) not having
+stated it, is stated `published` at that read -- the first read that saw
+it, so the true publication can be up to an hour earlier -- and each rate's
+age at the edge is reported from it (the feed delay, ruling 518); a day
+found later (the first read, after a pause, the history, a want) states
+none. Version 0.2.0 is built on `open-meridian==0.33.1`, contract v28.
+
 ## Using it
 
 Put it in a deployment that `meridian connect` signed you in to, and launch

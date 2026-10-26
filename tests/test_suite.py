@@ -21,9 +21,8 @@ A case about what Treasury never states (`about`) is not presented, with
 why: every case a rates-only plugin never presents, as the SDK names them
 (`meridian.roles.data.testing.RATES_NOT_PRESENTED`, ruling 538) -- prices
 (`an-exact-price` and `a-want-recorded-against` among them, about closes
-from ruling 537), trades, quotes, outcomes, and the feed delay, about
-`latency` until contract v28 (ruling 518); then
-Treasury's own: a reference rate's fixing and an index level (the NY Fed's
+from ruling 537), trades, quotes, outcomes, and from contract v28 option chains, filings and
+quotes' quality; then Treasury's own: a reference rate's fixing and an index level (the NY Fed's
 and the ECB's), a single-point series of another source's curve (FRED's),
 a stream's liveness (it records none), settlement dates, and
 `reads-a-calendar`, since its datasets declare no calendar until one of the
@@ -33,21 +32,31 @@ US government securities market is curated (the spec's Q15).
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 from meridian.plugin.v1 import operations_pb2 as ops
 from meridian.receive import Heard
-from meridian.roles.data.testing import RATES_NOT_PRESENTED
-from meridian.suites import ANSWERED_BY_SDK, Recorder, run, suite
+from meridian.roles.data.testing import RATES_NOT_PRESENTED, feed_delay
+from meridian.suites import ANSWERED_BY_SDK, Recorder, run
 
 from us_treasury.curves import BILLS, PAR
 from us_treasury.feed import Feed
 from us_treasury.raw import RawStore
 from us_treasury.treasury import month_path
 
-from conftest import AT, INSTANCE, RECORDS, Corrected, Recorded, answering, want
+from conftest import (
+    AT,
+    INSTANCE,
+    RECORDS,
+    Appearing,
+    Clock,
+    Corrected,
+    Recorded,
+    answering,
+    want,
+)
 
 #: The rates cases Treasury never presents, and the work it never does,
 #: each with why.
@@ -117,6 +126,20 @@ def producers(tmp: Path) -> dict[str, Callable[[Recorder], Awaitable[None]]]:
         [before] = [r for r in first.rates if r.meta.row_key == again.meta.row_key]
         assert before.value != again.value
 
+    async def delayed(recorder: Recorder, latency: Any) -> None:
+        # Contract v28 (ruling 518): 22 October's par curve first stated by
+        # the next hourly read, published then, each rate's age at the edge
+        # recorded and reported.
+        answering(recorder)
+        clock = Clock()
+        source = Appearing(clock)
+        work = Feed(recorder, source, RawStore(tmp / "delayed"), now=clock)
+        work.wants.latency = latency
+        await work.check()
+        clock.at += timedelta(hours=1)
+        source.appeared = True
+        await work.check()
+
     async def two_records(recorder: Recorder) -> None:
         recorder.answer(
             "ResolveIdentifier",
@@ -164,6 +187,7 @@ def producers(tmp: Path) -> dict[str, Callable[[Recorder], Awaitable[None]]]:
         "a-subject-declined": wanted(declined.message),
         "a-standing-want-withdrawn": withdrawn,
         "reads-its-datasets-licences": licences,
+        "reports-its-feed-delay": feed_delay(delayed),
     }
 
 
@@ -175,7 +199,7 @@ def test_the_data_suite_passes(tmp_path: Path) -> None:
     presented = {
         "a-curve-for-a-date", "a-tenor-not-published", "two-conventions-one-tenor",
         "a-same-day-revision", "an-asset-that-does-not-resolve", "a-subject-declined",
-        "a-standing-want-withdrawn", "reads-its-datasets-licences",
+        "a-standing-want-withdrawn", "reads-its-datasets-licences", "reports-its-feed-delay",
     }  # fmt: skip
     assert set(report.passed_cases) == presented | set(ANSWERED_BY_SDK)
 
@@ -184,14 +208,6 @@ def test_the_two_price_cases_are_about_closes() -> None:
     # Ruling 537: no longer required of a plugin recording no prices.
     assert NOT_PRESENTED["an-exact-price"] == "it records rates, never prices"
     assert NOT_PRESENTED["a-want-recorded-against"] == "it records rates, never prices"
-
-
-def test_every_latency_case_waits_for_contract_v28() -> None:
-    latency = [c.name for c in suite("data").cases if c.about == "latency"]
-    assert latency and all(
-        NOT_PRESENTED[n] == "core receives ReportLatency from contract v28, ruling 515"
-        for n in latency
-    )
 
 
 def test_the_lake_query_is_not_presented_for_it_records_no_trades() -> None:

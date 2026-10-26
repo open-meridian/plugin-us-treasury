@@ -1,7 +1,7 @@
 # meridian-us-treasury
 
 The US Treasury's daily interest rates as an Open Meridian data plugin, in
-Python on the open-meridian SDK (0.32.2, contract v27). It runs beside a
+Python on the open-meridian SDK (0.33.1, contract v28). It runs beside a
 sidecar in a Meridian deployment and puts each business day's par yield
 curve, real par yield curve and bill rates into the deployment's lake as
 rates (the lake's rates slice), each curve one referential record and its

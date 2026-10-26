@@ -61,7 +61,7 @@ class Reader:
         read = await rates.read_curve(self.plugin, one("subject"), one("date"), sources=sources)
         # What the lake left unanswered, asked once more for it alone.
         answer = await self.plugin.list_rates(
-            subjects=[ops.SubjectRef(entity_id=one("subject"))], business_date=one("date"),
+            subjects=[meridian.SubjectRef(entity_id=one("subject"))], business_date=one("date"),
             sources=sources)
         return {
             "rates": [rate_json(r) for r in read],
