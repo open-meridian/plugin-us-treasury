@@ -43,8 +43,15 @@ Treasury publishes each day's rates in the afternoon, New York time, after
 the market's closing quotes. The plugin checks the current month and the one
 before every hour, and records a day's curve when it appears; a value
 Treasury corrects in those weeks becomes the same row's next version.
-Treasury states no publication time, so none is recorded. A rate belongs to
-its day, New York time.
+Treasury states no publication time. A day that appears in an hourly check
+on its own day, the check before (within the hour) not having shown it, is
+recorded as published at that check: the true publication can be up to an
+hour earlier. A day found any other way -- the first check after a start or
+a pause, the history, an older day asked for -- has no publication time.
+How old each rate was when the plugin recorded it, from that time, is
+reported to the deployment. A rate belongs to its day, New York time.
+
+## Its history and older days
 
 On its first run the plugin reads each curve's history back, a year at a
 time: the par curve from 1990, the real curve from 2003, the bill rates from

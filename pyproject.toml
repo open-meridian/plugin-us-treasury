@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "us-treasury"
-version = "0.1.0"
+version = "0.2.0"
 description = "The US Treasury's daily par yield curve, real par yield curve and bill rates, into an Open Meridian deployment's lake"
 license = { text = "Apache-2.0" }
 requires-python = ">=3.11"
@@ -13,7 +13,7 @@ requires-python = ">=3.11"
 # pick up another. The Dockerfile's base is the same version. Treasury's
 # files are read with the standard library: no third-party dependency.
 dependencies = [
-  "open-meridian==0.32.2",
+  "open-meridian==0.33.1",
 ]
 
 [project.urls]

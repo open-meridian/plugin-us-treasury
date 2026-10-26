@@ -107,6 +107,37 @@ class Corrected(SyntheticTreasury):
         return Fetched(path, 200, body.encode(), later, got.date)
 
 
+#: 22 October 2026, 14:00 New York: a business day the sample's October par
+#: curve states, read that afternoon (from 0.2.0, the published time).
+ON_THE_DAY = datetime(2026, 10, 22, 18, 0, tzinfo=UTC)
+
+
+class Clock:
+    """A clock a test moves."""
+
+    def __init__(self, at: datetime = ON_THE_DAY) -> None:
+        self.at = at
+
+    def __call__(self) -> datetime:
+        return self.at
+
+
+class Appearing(SyntheticTreasury):
+    """Treasury's site, October's par curve without 22 October's line until
+    `appeared` is set: the day published between two hourly reads."""
+
+    def __init__(self, clock: Clock) -> None:
+        super().__init__(clock)
+        self.appeared = False
+
+    async def get(self, path: str) -> Fetched:
+        got = await super().get(path)
+        if self.appeared or "daily_treasury_yield_curve" not in path or "202610" not in path:
+            return got
+        body = "\n".join(x for x in got.text.split("\n") if not x.startswith("10/22/2026,"))
+        return Fetched(path, 200, body.encode(), got.fetched_at, got.date)
+
+
 def feed(tmp: Path, plugin: Any = None, at: datetime = AT, source: Any = None) -> Feed:
     """The plugin's work on the lake as a test stands it in and the recorded
     answers, at `at`."""

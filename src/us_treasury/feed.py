@@ -56,7 +56,7 @@ from zoneinfo import ZoneInfo
 import meridian
 from meridian.operations import Rate
 from meridian.plugin.v1 import operations_pb2 as ops
-from meridian.roles import data
+from meridian.roles import Latency, data
 from meridian.roles.data import rates
 
 from .curves import ADMINISTRATOR, BY_KEY, CURVES, Curve, NotRates, Read, parse
@@ -71,6 +71,10 @@ NEW_YORK = ZoneInfo(DAY_TIME_ZONE)
 MOST_DAYS = 366
 #: How many first-read lags are kept per curve, for the Lag section.
 LAGS = 2000
+#: How recent the read before must be for a day it did not state to be
+#: stated published now (from 0.2.0): an hourly read's, with ten minutes'
+#: slack.
+FRESH_WITHIN = timedelta(minutes=70)
 
 
 def _ns(moment: datetime) -> int:
@@ -181,6 +185,11 @@ class Feed:
         self.raw = raw
         self.now = now
         self.wants = data.Wants(plugin, tuple(BY_KEY), clock_ns=lambda: _ns(self.now()))
+        # Contract v28 (ruling 518): each rate recorded unasked or for a
+        # standing want has its age at the edge recorded from its published
+        # time, where it states one, reported every 10 seconds (`__main__`).
+        self.latency = Latency(plugin, clock_ns=lambda: _ns(self.now()))
+        self.wants.latency = self.latency
         self.rates = rates.Feed(
             plugin,
             ADMINISTRATOR,
@@ -244,11 +253,17 @@ class Feed:
         read: Read,
         key: str,
         days: Iterable[date] | None = None,
+        fresh: frozenset[date] = frozenset(),
     ) -> list[Rate]:
         """The rates `read` states for `subject`, on `days` where given: one
         row per point, never one for a tenor left empty. Each names the
         answer it was first read from (raw.py), so a rate read again -- the
-        next check, the history, a want, a restart -- is the same row."""
+        next check, the history, a want, a restart -- is the same row. A day
+        in `fresh` -- first stated by this read, on its own day, an hourly
+        read before having stated it not -- is stated published now
+        (`published`, from 0.2.0): Treasury states no time, so the true
+        publication can be up to an hour earlier; any other states none."""
+        published_ns = _ns(self.now())
         wanted = set(days) if days is not None else None
         made: list[Rate] = []
         for day in read.days:
@@ -260,6 +275,9 @@ class Feed:
                     f"{curve.key}:{column.kind}:{column.tenor}:{column.header}:"
                     f"{day.day.isoformat()}={point.text}"
                 )
+                raw_key, published = self.raw.first(
+                    said, day.day, key, published_ns if day.day in fresh else 0
+                )
                 made.append(
                     self.rates.rate(
                         subject,
@@ -270,7 +288,8 @@ class Feed:
                         convention=column.convention,
                         tenor=column.tenor,
                         series=curve.key,
-                        raw_key=self.raw.first(said, day.day, key),
+                        raw_key=raw_key,
+                        published_ns=published,
                     )
                 )
         self.raw.save_firsts()
@@ -284,13 +303,15 @@ class Feed:
         *,
         want_id: str = "",
         days: Iterable[date] | None = None,
+        fresh: frozenset[date] = frozenset(),
     ) -> Outcome:
         """Record what `read` states for the curve, against `want_id` where
-        given; nothing while its record does not resolve."""
+        given; nothing while its record does not resolve. `fresh`: the days
+        stated published now (`rows`)."""
         subject = await self.subject(curve)
         if not subject:
             return Outcome()
-        made = self.rows(curve, subject, read, key, days)
+        made = self.rows(curve, subject, read, key, days, fresh)
         counts = self.wants.sent_to(curve.key)
         before = (counts.recorded, counts.restated, counts.unchanged)
         if made:
@@ -319,6 +340,17 @@ class Feed:
                 lag = (_ns(self.now()) - day_start_ns(day.day)) // 10**9
                 held.lags = [*held.lags[-(LAGS - 1) :], lag]
 
+    def _fresh(self, curve: Curve, read: Read, before: datetime | None) -> frozenset[date]:
+        """The days `read` states first, on their own day, the read before
+        (`before`, within `FRESH_WITHIN`) having stated them not: stated
+        published at this read (from 0.2.0; ruling 518). A day first found
+        later -- the first read, after a pause, a past day -- states none."""
+        held = self.status.sources[curve.key]
+        if before is None or self.now() - before > FRESH_WITHIN:
+            return frozenset()
+        today = self.today()
+        return frozenset(d.day for d in read.days if d.day == today and d.day not in held.seen)
+
     async def check(self) -> dict[str, Outcome]:
         """Read each curve's current months; record what this process has not
         recorded as it reads now. What each recorded."""
@@ -327,15 +359,19 @@ class Feed:
         for curve in CURVES:
             held = self.status.sources[curve.key]
             total = Outcome()
+            # The read before this check's, which a day it did not state
+            # must follow to be stated published now.
+            before = held.read_at
             try:
                 for month in self.source.current(self.today()):
                     path = month_path(curve.feed_type, month)
                     read, _, key = await self.read(curve, path)
+                    fresh = self._fresh(curve, read, before)
                     self._note(curve, read)
                     digest = digest_of(read)
                     if self._digests.get(path) == digest:
                         continue
-                    outcome = await self.record(curve, read, key)
+                    outcome = await self.record(curve, read, key, fresh=fresh)
                     if held.instrument_id:
                         self._digests[path] = digest
                     total = Outcome(

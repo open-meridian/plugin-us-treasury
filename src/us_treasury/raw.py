@@ -28,7 +28,9 @@ rate, by what Treasury stated (its file, kind, tenor, column, day and
 value), is noted under `firsts/<YYYY-MM>.json` at the storage's root, a file
 per month of the rates' days. A corrected value is noted afresh, naming the
 answer that corrected it; a noted answer storage no longer holds is noted
-afresh too.
+afresh too. From 0.2.0 a rate's published time, where the plugin states one
+(feed.py), is noted beside the answer, so a rate read again states the same
+time; a month noted before then reads as stating none.
 
 **The history read** (`history.json` at the storage's root): each curve's
 past years read whole, so a restart reads on from where the last one
@@ -128,18 +130,22 @@ class RawStore:
 
     # ── Where each rate was first read ──────────────────────────────────
 
-    def first(self, said: str, day: date, key: str) -> str:
+    def first(self, said: str, day: date, key: str, published_ns: int = 0) -> tuple[str, int]:
         """The key of the answer a rate -- `said`, what Treasury stated of it,
-        its value among it -- was first read from, noting `key`, the answer it
-        is read from now, where none is noted or storage no longer holds it."""
+        its value among it -- was first read from, and the published time
+        noted with it (0 for none); noting `key`, the answer it is read from
+        now, and `published_ns` where none is noted or storage no longer
+        holds it."""
         month = f"{day:%Y-%m}"
         noted = self._month(month)
         held = noted.get(said)
-        if held and (self.root / held).is_file():
-            return held
-        noted[said] = key
+        if held:
+            kept, _, at = held.partition("@")
+            if (self.root / kept).is_file():
+                return kept, int(at) if at.isdigit() else 0
+        noted[said] = f"{key}@{published_ns}" if published_ns else key
         self._changed.add(month)
-        return key
+        return key, published_ns
 
     def save_firsts(self) -> None:
         """Write the months noted since the last save."""
