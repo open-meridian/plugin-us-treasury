@@ -39,7 +39,7 @@ def test_a_day_first_stated_by_the_next_hourly_read_is_published_then(tmp_path: 
     recorder = answering(Recorder(INSTANCE))
     clock = Clock()
     source = Appearing(clock)
-    work = Feed(recorder, source, RawStore(tmp_path), now=clock)
+    work = recorder.bind(Feed(source, RawStore(tmp_path), now=clock))
     asyncio.run(work.check())
     assert published(recorder) == {}
     clock.at += timedelta(hours=1)
@@ -54,7 +54,7 @@ def test_a_day_first_stated_by_the_next_hourly_read_is_published_then(tmp_path: 
     clock.at += timedelta(minutes=5)
     later = Appearing(clock)
     later.appeared = True
-    asyncio.run(Feed(again, later, RawStore(tmp_path), now=clock).check())
+    asyncio.run(again.bind(Feed(later, RawStore(tmp_path), now=clock)).check())
     assert published(again) == stated
 
 
@@ -62,14 +62,14 @@ def test_a_day_found_later_states_no_published_time(tmp_path: Path) -> None:
     # The first read of a process: the day was already there.
     recorder = answering(Recorder(INSTANCE))
     clock = Clock()
-    work = Feed(recorder, Appearing(clock), RawStore(tmp_path / "first"), now=clock)
+    work = recorder.bind(Feed(Appearing(clock), RawStore(tmp_path / "first"), now=clock))
     work.source.appeared = True  # type: ignore[attr-defined]
     asyncio.run(work.check())
     assert published(recorder) and set(published(recorder).values()) == {0}
     # After a pause: the read before is more than 70 minutes old.
     recorder = answering(Recorder(INSTANCE))
     source = Appearing(clock)
-    work = Feed(recorder, source, RawStore(tmp_path / "paused"), now=clock)
+    work = recorder.bind(Feed(source, RawStore(tmp_path / "paused"), now=clock))
     asyncio.run(work.check())
     clock.at += timedelta(hours=3)
     source.appeared = True
@@ -79,7 +79,7 @@ def test_a_day_found_later_states_no_published_time(tmp_path: Path) -> None:
     recorder = answering(Recorder(INSTANCE))
     clock = Clock(ON_THE_DAY + timedelta(days=1))
     source = Appearing(clock)
-    work = Feed(recorder, source, RawStore(tmp_path / "past"), now=clock)
+    work = recorder.bind(Feed(source, RawStore(tmp_path / "past"), now=clock))
     asyncio.run(work.check())
     clock.at += timedelta(hours=1)
     source.appeared = True

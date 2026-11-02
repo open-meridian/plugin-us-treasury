@@ -140,13 +140,10 @@ class Appearing(SyntheticTreasury):
 
 def feed(tmp: Path, plugin: Any = None, at: datetime = AT, source: Any = None) -> Feed:
     """The plugin's work on the lake as a test stands it in and the recorded
-    answers, at `at`."""
-    return Feed(
-        plugin if plugin is not None else lake(),
-        source or Recorded(at),
-        RawStore(tmp),
-        now=lambda: at,
-    )
+    answers, at `at`: its data role class bound to the lake (open-meridian
+    0.35)."""
+    held = plugin if plugin is not None else lake()
+    return held.bind(Feed(source or Recorded(at), RawStore(tmp), now=lambda: at))
 
 
 def want(

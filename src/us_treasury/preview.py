@@ -67,7 +67,7 @@ def _feed() -> Feed:
             ops.Identifier(scheme="symbol", value=curve.code, source=ADMINISTRATOR),
             asset_class=ops.ASSET_CLASS_REFERENTIAL,
         )
-    return Feed(lake, SyntheticTreasury(lambda: AT), RawStore(), now=lambda: AT)
+    return lake.bind(Feed(SyntheticTreasury(lambda: AT), RawStore(), now=lambda: AT))
 
 
 async def synthetic_feed() -> Feed:
@@ -76,9 +76,9 @@ async def synthetic_feed() -> Feed:
     await feed.check()
     await feed.history()
     par = feed.status.sources["ust_par"].instrument_id
-    await feed.on_want(_want("want-0925", par, "2026-09-25"))
-    await feed.on_want(_want("want-1017", par, "2026-10-17"))
-    await feed.on_want(_want("want-standing", par, standing=True))
+    await feed.on_observations_wanted(_want("want-0925", par, "2026-09-25"))
+    await feed.on_observations_wanted(_want("want-1017", par, "2026-10-17"))
+    await feed.on_observations_wanted(_want("want-standing", par, standing=True))
     return feed
 
 

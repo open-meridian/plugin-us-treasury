@@ -83,7 +83,7 @@ NOT_PRESENTED = {**RATES_NOT_PRESENTED, **TREASURY_NEVER}
 
 def producers(tmp: Path) -> dict[str, Callable[[Recorder], Awaitable[None]]]:
     def work(recorder: Recorder, source: Any = None) -> Feed:
-        return Feed(recorder, source or Recorded(), RawStore(tmp), now=lambda: AT)
+        return recorder.bind(Feed(source or Recorded(), RawStore(tmp), now=lambda: AT))
 
     async def a_month(recorder: Recorder, key: str, month: datetime) -> None:
         answering(recorder)
@@ -133,7 +133,7 @@ def producers(tmp: Path) -> dict[str, Callable[[Recorder], Awaitable[None]]]:
         answering(recorder)
         clock = Clock()
         source = Appearing(clock)
-        work = Feed(recorder, source, RawStore(tmp / "delayed"), now=clock)
+        work = recorder.bind(Feed(source, RawStore(tmp / "delayed"), now=clock))
         work.wants.latency = latency
         await work.check()
         clock.at += timedelta(hours=1)
@@ -154,7 +154,7 @@ def producers(tmp: Path) -> dict[str, Callable[[Recorder], Awaitable[None]]]:
             answering(recorder)
             feed = work(recorder)
             recorder.answer("ObservationsWanted", lambda _: message)
-            await recorder.receive(observations_wanted=feed.on_want)
+            await recorder.hear(feed)
 
         return produce
 
@@ -165,7 +165,7 @@ def producers(tmp: Path) -> dict[str, Callable[[Recorder], Awaitable[None]]]:
             "WantWithdrawn",
             lambda _: ops.WantWithdrawnEvent(want_id="w-standing", dataset=f"{INSTANCE}:ust_par"),
         )
-        await recorder.receive(want_withdrawn=feed.on_withdrawn)
+        await recorder.hear(feed)
 
     async def licences(recorder: Recorder) -> None:
         dataset = f"{INSTANCE}:ust_par"
