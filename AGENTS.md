@@ -1,7 +1,7 @@
 # meridian-us-treasury
 
 The US Treasury's daily interest rates as an Open Meridian data plugin, in
-Python on the open-meridian SDK (0.33.1, contract v28). It runs beside a
+Python on the open-meridian SDK (0.35.2, contract v29). It runs beside a
 sidecar in a Meridian deployment and puts each business day's par yield
 curve, real par yield curve and bill rates into the deployment's lake as
 rates (the lake's rates slice), each curve one referential record and its
@@ -27,7 +27,12 @@ publisher's feed).
   `meridian.roles.data.rates` (`Feed.subject`, `Feed.rate`, `Feed.record`;
   ruling 345), pushes the current months hourly, reads each curve's history
   back on the first run, and answers the lake's wants or declines them
-  (W10.7) through the SDK's `meridian.roles.data.Wants`.
+  (W10.7) through the SDK's `meridian.roles.data.Wants`. `Feed` is the
+  data role's class (open-meridian 0.35: each role one class), its acts
+  made on itself; `__main__.py`'s `Lake` adds its lifecycle (`on_settings`,
+  and its loops in `run`) and registers it with `meridian.run`. Its tests
+  bind it to the suite's `Recorder` (`recorder.bind(...)`,
+  `recorder.hear(...)`).
 - `src/us_treasury/raw.py` keeps every answer as received in the storage the
   deployment grants, notes the history read, and moves months past their
   window as the SDK's settings say.
@@ -122,10 +127,10 @@ and subscribe to comes from the roles `pyproject.toml` declares under
   the external account its connection reaches, and the sidecar takes it only
   once that external account is linked to one of the deployment's accounts
   (from contract v7; a statement naming none is refused). So the plugin
-  reports what it reaches (`plugin.report_external_accounts`, at start and
+  reports what it reaches (`self.report_external_accounts`, at start and
   when that changes), an admin of the plugin links each on its own Manage
-  page (`plugin.link_external_account(..., acting_for=request.caller.header)`,
-  the accounts offered from `plugin.read_accounts_for_linking`), and which are
+  page (`self.link_external_account(..., acting_for=request.caller.header)`,
+  the accounts offered from `self.read_accounts_for_linking`), and which are
   linked is the plugin's account scope (`plugin.account_scope()`, its
   `links`), read rather than kept. The template does exactly this: Setup
   links `reference-1`, and the Accounts page opens a statement for a linked
@@ -158,8 +163,9 @@ and subscribe to comes from the roles `pyproject.toml` declares under
   [meridian.Figure("Connections", 3, state="warn", why="...")]`, sent on its
   heartbeat). Build no summary page or tiles of your own; report figures
   only where the plugin has work worth counting.
-- **Hear what the plugin's roles hear with `plugin.receive`**, a handler per
-  row (`custodial_position_updated=...`), and keep nothing of it: the SDK
+- **Hear what the plugin's roles hear in each role's class** (SDK 0.35), an
+  `on_<row>` method per row (`on_custodial_position_updated`), the classes
+  registered with `meridian.run(roles=[...])`, and keep nothing of it: the SDK
   reads the store on every start and after any gap, loss or broken stream,
   handing what it read on as `heard.caught_up`. A handler sees each change
   once, in order, and no store number. Everything heard and read is within
@@ -183,7 +189,7 @@ and subscribe to comes from the roles `pyproject.toml` declares under
 - **A custody plugin reports the custodian's activity, as the custodian
   states it.** Each activity on an account -- a purchase, a sale, a
   reinvested dividend, a split, a fee, a transfer -- goes to the street with
-  `plugin.record_activity(external_account_id=..., source=...,
+  `self.record_activity(external_account_id=..., source=...,
   activity=meridian.CustodialActivity(...))`. It is evidence that explains a
   break, never a source: the street derives no position, lot or figure from
   it, and nothing moves the book until a person confirms. Its `kind` is the
@@ -199,7 +205,7 @@ and subscribe to comes from the roles `pyproject.toml` declares under
   kept once, so a retry or a resync is safe; a custodian restating an
   activity under a new identifier is a new one, reported, never merged. Say
   how far back the custodian's history reaches with
-  `plugin.report_sync_status(..., history_from="YYYY-MM-DD")`, report past
+  `self.report_sync_status(..., history_from="YYYY-MM-DD")`, report past
   activity back to it on first connection (a backfill), then each sync's new
   activity. Report each sync status as it changes, `state` saying what holds
   (`SYNC_STATE_NEEDS_SIGN_IN` when the person must sign in again): the street
@@ -266,23 +272,23 @@ and subscribe to comes from the roles `pyproject.toml` declares under
   and report what does not resolve (`report_missing_instrument`,
   `report_missing_venue`); keep the vendor's product map in storage, never a
   vendor's code as a key. Record in batches of at most 500
-  (`plugin.record_prices`, `plugin.record_bars`), each row's `row_key` made
+  (`self.record_prices`, `self.record_bars` on the data role's class), each row's `row_key` made
   from its raw record so a repeat changes nothing and the day still forming is
   restated under the same key, its `business_date` a `datetime.date` in the
   dataset's declared day, its number parsed from the vendor's text as a
   `Decimal` (never through a `float`), and a price in a stablecoin on the
   token's own cash instrument (`Money(amount, instrument_id=...)`), never a
-  fiat code. Hear wants with `plugin.receive(observations_wanted=...,
-  want_withdrawn=...)`, record against each (`want_id=`) or decline it per
-  subject (`plugin.decline_want`). Its pages show its connection and its
+  fiat code. Hear wants in the data role's class (`on_observations_wanted`,
+  `on_want_withdrawn`, registered with `meridian.run`), record against each
+  (`want_id=`) or decline it per subject (`self.decline_want`). Its pages show its connection and its
   datasets, never a price: prices are the reading roles'. Hold it to the
   suite: `meridian.suites.run("data", producers)` on synthetic exchanges, each
   case mapped to the plugin's own conversion.
 - **A data plugin streaming trades and quotes records them as its source states
   them, converted at the edge.** Declare them in a live dataset apart
   (`data_types=["meridian.v1.Trade", "meridian.v1.Quote"]`, `modes=["stream"]`)
-  and record in batches of at most 500 (`plugin.record_trades`,
-  `plugin.record_quotes`), keyed by UTC instants with no `business_date`. A
+  and record in batches of at most 500 (`self.record_trades`,
+  `self.record_quotes`), keyed by UTC instants with no `business_date`. A
   trade carries its `meridian.TradeAttributes` in the platform's words,
   converted from the source's condition codes (a code with no conversion
   kept as reported in `meta.unconverted`, never guessed), and its
@@ -299,7 +305,7 @@ and subscribe to comes from the roles `pyproject.toml` declares under
   (`meridian.roles.data.backfill_restart`: the last trade it recorded of each
   subject, `list_trades(..., latest_recorded=True)`, then the venue's history
   after it), and reads which of its datasets are licensed
-  (`plugin.list_datasets()`, its `licences`).
+  (`self.list_datasets()`, its `licences`).
 - **Use the role's common logic; never copy it from another plugin.** What
   every plugin of a role does the same is the SDK's (0.30.0):
   `meridian.roles.data.Wants` hears what the lake wants, answers it with the
@@ -368,7 +374,7 @@ and subscribe to comes from the roles `pyproject.toml` declares under
   across versions.
 - **Work out a date in core, never by hand.** A settlement date, a spot or
   tenor date, a roll or whether a day is a business day is
-  `plugin.compute_date(...)`, a calendar's days `plugin.read_calendar(...)`:
+  `self.compute_date(...)`, a calendar's days `self.read_calendar(...)`:
   the deployment's calendars and rules, one answer for every plugin, with
   the basis it was worked out on. A date outside a calendar's coverage is
   answered as such, never guessed.
@@ -430,7 +436,7 @@ running plugin to it: a version registering anything its upload did not
 declare is refused, naming the difference. So:
 
 - declare everything in `Declaration(...)` and call
-  `meridian.connect(declaration=DECLARATION)` alone;
+  `meridian.run(declaration=DECLARATION, roles=[...])` with it alone;
 - keep the interface's port fixed (`PORT`), never read from the
   environment;
 - keep `declaration.py` importing every module that declares a page or a

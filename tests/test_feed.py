@@ -36,11 +36,12 @@ def rows(plugin: Recorder) -> list[ops.Rate]:
 
 
 async def test_the_current_months_pushed_whole(tmp_path: Path) -> None:
-    work = feed(tmp_path)
+    plugin = lake()
+    work = feed(tmp_path, plugin)
     done = await work.check()
     assert {k: o.recorded for k, o in done.items()} == {k: DAYS * n for k, n in POINTS.items()}
-    sent = rows(work.plugin)
-    assert all(not b.want_id for b in work.plugin.on("RecordRates"))
+    sent = rows(plugin)
+    assert all(not b.want_id for b in plugin.on("RecordRates"))
     assert {r.meta.subjects[0].entity_id for r in sent} == {PAR, REAL, BILLS}
     ten = next(
         r for r in sent
@@ -62,17 +63,19 @@ async def test_the_current_months_pushed_whole(tmp_path: Path) -> None:
 
 
 async def test_every_value_is_exact(tmp_path: Path) -> None:
-    work = feed(tmp_path)
+    plugin = lake()
+    work = feed(tmp_path, plugin)
     await work.check()
-    values = [str(as_decimal(r.value.value)) for r in rows(work.plugin)]
+    values = [str(as_decimal(r.value.value)) for r in rows(plugin)]
     assert all("e" not in v.lower() and len(v.split(".")[-1]) == 2 for v in values)
 
 
 async def test_a_bills_tenor_is_two_rows(tmp_path: Path) -> None:
-    work = feed(tmp_path)
+    plugin = lake()
+    work = feed(tmp_path, plugin)
     await work.check()
     day = [
-        r for r in rows(work.plugin)
+        r for r in rows(plugin)
         if r.meta.subjects[0].entity_id == BILLS and r.meta.business_date == "2026-10-22"
         and rates.tenor_label(r.tenor) == "13W"
     ]  # fmt: skip
@@ -84,12 +87,13 @@ async def test_a_bills_tenor_is_two_rows(tmp_path: Path) -> None:
 
 
 async def test_a_read_unchanged_is_not_recorded_again(tmp_path: Path) -> None:
-    work = feed(tmp_path)
+    plugin = lake()
+    work = feed(tmp_path, plugin)
     await work.check()
     again = await work.check()
     assert all(o.sent == 0 for o in again.values())
     # Each curve's two current months, recorded once.
-    assert len(work.plugin.on("RecordRates")) == 6
+    assert len(plugin.on("RecordRates")) == 6
 
 
 async def test_a_correction_is_the_same_rows_next_version(tmp_path: Path) -> None:
@@ -113,17 +117,18 @@ async def test_a_record_not_held_is_reported_and_its_rows_wait(tmp_path: Path) -
     work = feed(tmp_path, plugin=plugin)
     done = await work.check()
     assert done["ust_real"].sent == 0 and done["ust_par"].recorded
-    [missed] = work.plugin.on("ReportMissingInstrument")
+    [missed] = plugin.on("ReportMissingInstrument")
     assert missed.identifiers[0].value == "Daily Treasury Par Real Yield Curve Rates"
     assert missed.identifiers[0].source == "ustreasury"
     assert work.status.sources["ust_real"].miss
     # Once a day: the next check asks again, and reports nothing new.
     await work.check()
-    assert len(work.plugin.on("ReportMissingInstrument")) == 1
+    assert len(plugin.on("ReportMissingInstrument")) == 1
 
 
 async def test_the_history_read_back_to_each_first_year(tmp_path: Path) -> None:
-    work = feed(tmp_path)
+    plugin = lake()
+    work = feed(tmp_path, plugin)
     await work.check()
     years = await work.history()
     # 1990 to 2026, 2003 to 2026 and 2002 to 2026.
@@ -131,10 +136,10 @@ async def test_the_history_read_back_to_each_first_year(tmp_path: Path) -> None:
     assert all(s.history_done for s in work.status.sources.values())
     assert work.status.sources["ust_par"].history_from == 1990
     # 2002's bill rates are recorded from the tests' answer.
-    bills = {r.meta.business_date for r in rows(work.plugin) if r.meta.business_date < "2003"}
+    bills = {r.meta.business_date for r in rows(plugin) if r.meta.business_date < "2003"}
     assert "2002-12-31" in bills
     # A new process on the same storage reads only the current year again.
-    later = Feed(work.plugin, Recorded(), RawStore(tmp_path), now=lambda: AT)
+    later = plugin.bind(Feed(Recorded(), RawStore(tmp_path), now=lambda: AT))
     await later.check()
     assert await later.history() == 3
 
@@ -162,45 +167,49 @@ async def test_treasury_not_reached_is_said(tmp_path: Path) -> None:
         async def get(self, path: str) -> Fetched:
             raise TreasuryUnreachable("https://home.treasury.gov: ConnectionRefusedError")
 
-    work = feed(tmp_path, source=Down())
+    plugin = lake()
+    work = feed(tmp_path, plugin, source=Down())
     done = await work.check()
     assert all(o.sent == 0 for o in done.values())
     assert "ConnectionRefusedError" in work.status.error
-    assert not work.plugin.on("RecordRates")
+    assert not plugin.on("RecordRates")
     # The history waits for Treasury, and resolves nothing before it answers.
     assert await work.history() == 0
-    assert not work.plugin.on("ResolveIdentifier")
+    assert not plugin.on("ResolveIdentifier")
     assert work.status.sources["ust_par"].history_error == "waiting for Treasury to answer"
 
 
 async def test_a_day_wanted_is_recorded_against_the_want(tmp_path: Path) -> None:
-    work = feed(tmp_path)
-    await work.on_want(want("w-1", [PAR], day="2025-02-18"))
-    [batch] = work.plugin.on("RecordRates")
+    plugin = lake()
+    work = feed(tmp_path, plugin)
+    await work.on_observations_wanted(want("w-1", [PAR], day="2025-02-18"))
+    [batch] = plugin.on("RecordRates")
     assert batch.want_id == "w-1" and len(batch.rates) == 14
     assert {r.meta.business_date for r in batch.rates} == {"2025-02-18"}
-    assert not work.plugin.on("DeclineWant")
+    assert not plugin.on("DeclineWant")
 
 
 async def test_a_range_wanted_reads_each_year(tmp_path: Path) -> None:
-    work = feed(tmp_path)
+    plugin = lake()
+    work = feed(tmp_path, plugin)
     start = int(datetime(2025, 2, 13, 5, tzinfo=UTC).timestamp()) * 10**9
     until = int(datetime(2025, 2, 19, 5, tzinfo=UTC).timestamp()) * 10**9
-    await work.on_want(want("w-r", [PAR], valid_from_ns=start, valid_until_ns=until))
-    days = {r.meta.business_date for r in rows(work.plugin)}
+    await work.on_observations_wanted(want("w-r", [PAR], valid_from_ns=start, valid_until_ns=until))
+    days = {r.meta.business_date for r in rows(plugin)}
     assert days == {"2025-02-13", "2025-02-14", "2025-02-18"}
 
 
 async def test_wants_declined_with_why(tmp_path: Path) -> None:
-    work = feed(tmp_path)
-    await work.on_want(want("w-weekend", [PAR], day="2026-10-17"))
-    await work.on_want(want("w-old", [PAR], day="1985-06-03"))
-    await work.on_want(want("w-other", ["INS-SOFR"], day="2026-10-22"))
-    await work.on_want(want("w-type", [PAR], day="2026-10-22", data_type="meridian.v1.Price"))
-    await work.on_want(want("w-future", [PAR], day="2026-12-01"))
-    declined = {
-        d.want_id: ops.UnansweredReason.Name(d.reason) for d in work.plugin.on("DeclineWant")
-    }
+    plugin = lake()
+    work = feed(tmp_path, plugin)
+    await work.on_observations_wanted(want("w-weekend", [PAR], day="2026-10-17"))
+    await work.on_observations_wanted(want("w-old", [PAR], day="1985-06-03"))
+    await work.on_observations_wanted(want("w-other", ["INS-SOFR"], day="2026-10-22"))
+    await work.on_observations_wanted(
+        want("w-type", [PAR], day="2026-10-22", data_type="meridian.v1.Price")
+    )
+    await work.on_observations_wanted(want("w-future", [PAR], day="2026-12-01"))
+    declined = {d.want_id: ops.UnansweredReason.Name(d.reason) for d in plugin.on("DeclineWant")}
     assert declined == {
         "w-weekend": "UNANSWERED_REASON_SOURCE_SILENT",
         "w-old": "UNANSWERED_REASON_BEYOND_HISTORY",
@@ -208,18 +217,19 @@ async def test_wants_declined_with_why(tmp_path: Path) -> None:
         "w-type": "UNANSWERED_REASON_NOT_COVERED",
         "w-future": "UNANSWERED_REASON_SOURCE_SILENT",
     }
-    assert not work.plugin.on("RecordRates")
+    assert not plugin.on("RecordRates")
 
 
 async def test_a_standing_want_kept_until_withdrawn(tmp_path: Path) -> None:
     from meridian.receive import Heard
 
-    work = feed(tmp_path)
-    await work.on_want(want("w-s", [PAR], standing=True))
+    plugin = lake()
+    work = feed(tmp_path, plugin)
+    await work.on_observations_wanted(want("w-s", [PAR], standing=True))
     assert "w-s" in work.wants.standing
     # The latest day, read first: no want had come before the push.
-    assert {r.meta.business_date for r in work.plugin.on("RecordRates")[-1].rates} == {"2026-10-22"}
-    await work.on_withdrawn(
+    assert {r.meta.business_date for r in plugin.on("RecordRates")[-1].rates} == {"2026-10-22"}
+    await work.on_want_withdrawn(
         Heard(row="WantWithdrawn", message=ops.WantWithdrawnEvent(want_id="w-s"))
     )
     assert "w-s" not in work.wants.standing
@@ -257,26 +267,28 @@ def test_the_next_day_expected_is_a_weekday() -> None:
 
 
 async def test_a_rate_read_again_names_the_answer_it_was_first_read_from(tmp_path: Path) -> None:
-    work = feed(tmp_path)
+    plugin = lake()
+    work = feed(tmp_path, plugin)
     await work.check()
-    first = {r.meta.row_key: r.meta.raw.key for r in rows(work.plugin)}
+    first = {r.meta.row_key: r.meta.raw.key for r in rows(plugin)}
     # The history reads the current year again, a restart reads it all again:
     # each rate names the same answer, so the lake answers it unchanged.
     await work.history()
-    later = Feed(work.plugin, Recorded(), RawStore(tmp_path), now=lambda: AT)
+    later = plugin.bind(Feed(Recorded(), RawStore(tmp_path), now=lambda: AT))
     await later.check()
-    again = [r for r in rows(work.plugin) if r.meta.row_key in first]
+    again = [r for r in rows(plugin) if r.meta.row_key in first]
     assert len(again) > len(first)
     assert all(r.meta.raw.key == first[r.meta.row_key] for r in again)
     assert all(o.restated == 0 for o in (await later.check()).values())
 
 
 async def test_a_corrected_rate_names_the_answer_that_corrected_it(tmp_path: Path) -> None:
-    work = feed(tmp_path, source=Corrected())
+    plugin = lake()
+    work = feed(tmp_path, plugin, source=Corrected())
     await work.check()
-    before = {r.meta.row_key: r.meta.raw.key for r in rows(work.plugin)}
+    before = {r.meta.row_key: r.meta.raw.key for r in rows(plugin)}
     await work.check()
-    batch = work.plugin.on("RecordRates")[-1].rates
+    batch = plugin.on("RecordRates")[-1].rates
     changed = [r for r in batch if r.meta.raw.key != before[r.meta.row_key]]
     assert [rates.tenor_label(r.tenor) for r in changed] == ["10Y"]
     assert changed[0].meta.business_date == "2026-10-22"
