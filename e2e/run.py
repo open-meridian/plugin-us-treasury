@@ -198,7 +198,8 @@ def run():
         entry = listed.get(dataset, {}).get("catalogue_entry", {})
         must(entry.get("modes") == ["push", "pull"] and entry.get("day_time_zone") == "America/New_York"
              and not entry.get("day_end_minute") and entry.get("cadence") == 86400
-             and not entry.get("calendar_id"),
+             and not entry.get("calendar_id")
+             and "US government" in json.dumps(entry.get("terms_and_pricing", "")),
              f"step 3, core lists {dataset} as declared: {listed.get(dataset)}")
 
     # 4. Licensed and entitled.

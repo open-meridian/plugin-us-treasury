@@ -23,13 +23,14 @@ def test_three_daily_datasets_of_rates() -> None:
     assert [d.history for d in CATALOGUE] == [13_400, 8_400, 8_700]
 
 
-def test_us_government_work_is_not_one_persons() -> None:
+def test_us_government_work_is_described_in_words() -> None:
+    # Contract 30 (ruling 1032): Treasury's terms in words, never a licence;
+    # a gap is asked for again, Treasury serving each curve's history.
     for dataset in CATALOGUE:
-        licence = dataset.licence_default
-        assert licence is not None
-        assert licence.kept and licence.display
-        assert licence.derived_use and licence.derived_use_terms == "not_restricted"
-        assert not licence.personal_use and licence.retention_days == 0
+        assert "US government" in dataset.terms_and_pricing
+        assert len(dataset.terms_and_pricing) <= 2000
+        assert dataset.gap_recovery == "backfill"
+        assert not dataset.sessions_calendar_id
 
 
 def test_the_answers_are_kept_in_storage() -> None:

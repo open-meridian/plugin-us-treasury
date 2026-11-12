@@ -26,20 +26,24 @@ wants it:
   no calendar the platform curates holds yet; the spec's Q15 says to declare
   none until one is curated, so the plugin assumes Monday to Friday;
 - no venue: Treasury's curves are its own, no venue's;
-- the licence its terms suggest: kept, derived use not restricted, and
-  display, with no limit on retention, and not one person's terms. The data
-  are US government work: no attribution is required, and the plugin cites
-  Treasury as the source on its Datasets page and in docs/terms.md. A
-  deployment's licence confirms or replaces the default on the Data sources
-  page; the plugin says nothing of whether a deployment meets anyone's
-  terms.
+- its terms and pricing in plain words (contract 30, ruling 1032;
+  `terms_and_pricing`): free, no key, US government work, which Fiscal Data
+  allows reused commercially; no attribution is required, and the plugin
+  cites Treasury as the source on its Datasets page and in docs/terms.md.
+  Never a licence: the deployment admin's licence on the Data sources page
+  is the one enforced, and the plugin says nothing of whether a deployment
+  meets anyone's terms;
+- a gap recovered by `backfill` (contract 30, `gap_recovery`): Treasury
+  serves each curve's history, so the lake asks for the days again. No
+  `sessions_calendar_id`: a curve is published once a day, in no trading
+  session.
 
 **Storage:** Treasury's answers (raw.py), archivable, ten years by default.
 """
 
 from __future__ import annotations
 
-from meridian import DatasetDeclaration, DatasetLicence
+from meridian import DatasetDeclaration
 from meridian.declaration import RecordKind
 
 from .curves import BILLS, PAR, REAL, Curve
@@ -52,6 +56,14 @@ CADENCE = 86_400
 #: New York's day, ending at midnight.
 DAY_TIME_ZONE = "America/New_York"
 DAY_END_MINUTE = 0
+#: Treasury's terms and pricing in plain words (contract 30, ruling 1032).
+TERMS = (
+    "The U.S. Department of the Treasury publishes its daily par yield curve, real par "
+    "yield curve and bill rates free of charge on home.treasury.gov, with no key and no "
+    "account. They are a work of the US government, not subject to copyright in the "
+    "United States (17 U.S.C. 105), and Treasury's Fiscal Data allows their commercial "
+    "reuse. No attribution is required; cite Treasury as the source."
+)
 #: Each dataset's history, in days, as the spec's catalogue states it.
 HISTORY = {PAR.key: 13_400, REAL.key: 8_400, BILLS.key: 8_700}
 
@@ -64,9 +76,8 @@ def declared(curve: Curve) -> DatasetDeclaration:
         modes=["push", "pull"],
         cadence=CADENCE,
         history=HISTORY[curve.key],
-        licence_default=DatasetLicence(
-            kept=True, derived_use=True, derived_use_terms="not_restricted", display=True
-        ),
+        terms_and_pricing=TERMS,
+        gap_recovery="backfill",
         day_time_zone=DAY_TIME_ZONE,
         day_end_minute=DAY_END_MINUTE,
     )

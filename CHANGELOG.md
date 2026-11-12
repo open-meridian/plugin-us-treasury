@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.4.0
+
+On open-meridian 0.36.0, contract 30, on core aae501d's harness (chart
+0.1.538); `meridian` 0.1.60 in the check. What the plugin records is
+unchanged.
+
+- **Treasury's terms in words** (ruling 1032): each dataset's
+  `licence_default` is gone, and `terms_and_pricing` says Treasury's daily
+  rates are free, need no key, are US government work Fiscal Data allows
+  reused commercially, with no attribution required. Shown on Data sources
+  and in the Datasets page's row details (the page's own default-terms line
+  is gone: the SDK's row shows the words). The licence a deployment admin
+  sets is the one enforced; the plugin states none.
+- **A gap recovered by backfill** (`gap_recovery`): Treasury serves each
+  curve's history, so the lake asks for the days again. No
+  `sessions_calendar_id`: a curve is published once a day, in no session.
+- **Row keys checked against the lake's rule 5** (ruled 2026-11-12): every
+  rate is made by the SDK's `rates.Feed`, keyed by the curve, the kind, the
+  tenor, the convention, the business date and the curve's record, valid
+  over that day; a rate Treasury corrects is restated under the same key,
+  so neither its valid time nor its first subject can change.
+- e2e: core lists each dataset with Treasury's terms in words.
+- `meridian plugin migrate --to 0.36.0` moved the pins (the base by digest,
+  `meridian` 0.1.60) and wrote the licence as words, rewritten by hand.
+- Core's runtime and harness images at `aae501d`, by digest.
+
 ## 0.3.0
 
 On open-meridian 0.35.2, contract v29 (rulings 1001 to 1005 and 1009 to 1023:

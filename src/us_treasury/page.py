@@ -57,7 +57,6 @@ ATTRIBUTION = (
     "Source: U.S. Department of the Treasury, daily Treasury rates. US government work: "
     "no attribution is required, and Treasury is cited as the source."
 )
-DEFAULT_TERMS = "kept, derived use not restricted, display; US government work"
 #: What each file's rows are.
 ROWS = {
     "ust_par": "par yields, bond-equivalent, one row a tenor",
@@ -216,7 +215,6 @@ def datasets_read(status: Status, feed: Feed | None) -> records.DatasetsRead:
         feed.wants if feed is not None else None,
         "Yes: no key needed" if status.read or status.mode == "synthetic" else "Not asked yet",
     )
-    served = [replace(s, default_terms=DEFAULT_TERMS) for s in served]
     unread: dict[str, int] = {}
     for held in status.sources.values():
         for line, seen in held.unread.items():

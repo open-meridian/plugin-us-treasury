@@ -23,8 +23,10 @@ stated it, is stated `published` at that read -- the first read that saw
 it, so the true publication can be up to an hour earlier -- and each rate's
 age at the edge is reported from it (the feed delay, ruling 518); a day
 found later (the first read, after a pause, the history, a want) states
-none. Version 0.3.0 is built on `open-meridian==0.35.2`, contract v29: its
-work is one class for its role, registered with `meridian.run`.
+none. Version 0.4.0 is built on `open-meridian==0.36.0`, contract 30: each
+dataset describes Treasury's terms in words (`terms_and_pricing`, never a
+licence) and declares a gap recovered by backfill; from 0.3.0 its work is
+one class for its role, registered with `meridian.run`.
 
 ## Using it
 

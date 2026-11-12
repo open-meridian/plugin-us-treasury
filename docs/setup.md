@@ -22,10 +22,10 @@ Its settings, in the dashboard's Settings form:
 On the deployment's **Data sources** page (deployment admins):
 
 1. **License** `<instance>:ust_par`, `<instance>:ust_real` and
-   `<instance>:ust_bills`. Each catalogue default is kept, with derived use
-   not restricted and display, no limit on retention, and not one person's
-   terms: Treasury's data are US government work. Confirm the default, or
-   set your own, with a note saying why.
+   `<instance>:ust_bills`. Each row says Treasury's terms in words: free,
+   US government work, reusable commercially, no attribution required. Set
+   the licence your use calls for -- kept, derived use not restricted,
+   display, not one person's terms -- with a note saying why.
 2. **Entitle** each plugin that reads rates, such as your reporting or
    analytics plugin.
 3. **Priority**, where another dataset also records these curves' points
