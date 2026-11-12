@@ -24,8 +24,8 @@ which can change. Not legal advice.
 
 None is required. The plugin cites "Source: U.S. Department of the
 Treasury, daily Treasury rates" on its Datasets page, and you may show the
-same where the rates are shown. Each dataset's default licence declares the
-rates kept, with derived use not restricted and display.
+same where the rates are shown. Each dataset describes these terms in
+words on the Data sources page; the licence is the deployment admin's.
 
 The dataset's licence on your Data sources page is what your deployment
 records; neither the plugin nor this page says whether your use meets
